@@ -43,7 +43,7 @@ export class SignUpDto {
   password: string;
 
   @ApiProperty({
-    description: 'Format: "yyyy-mm-dd". Required only if user role is PATIENT',
+    description: 'Format: "yyyy-mm-dd"',
   })
   @IsDateString()
   @Validate(IsOver18Years)

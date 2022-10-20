@@ -1,8 +1,22 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsMongoId, IsString, Matches, MinLength } from 'class-validator';
+import {
+  IsMongoId,
+  IsString,
+  Length,
+  Matches,
+  MinLength,
+} from 'class-validator';
 import { Match } from '../../../../common/decorators/match.decorator';
 
 export class PasswordResetDto {
+  @ApiProperty()
+  @IsString()
+  @Length(6, 6, {
+    message: 'Token must be exactly 6 characters',
+  })
+  token: string;
+
+  @ApiProperty()
   @MinLength(8)
   @Matches(
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!"#$%&'()*+,-./:;<=>?@[\\\]^_`{|}~])[A-Za-z\d!"#$%&'()*+,-./:;<=>?@[\\\]^_`{|}~]{8,}$/,

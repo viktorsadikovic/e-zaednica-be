@@ -1,5 +1,7 @@
-import { Prop, Schema } from '@nestjs/mongoose';
-import { SchemaTypes, Types } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, SchemaTypes, Types } from 'mongoose';
+
+export type MessageDocument = Message & Document;
 
 @Schema({ timestamps: true })
 export class Message {
@@ -13,3 +15,5 @@ export class Message {
   text: string;
   // files: string[];
 }
+
+export const MessageSchema = SchemaFactory.createForClass(Message);

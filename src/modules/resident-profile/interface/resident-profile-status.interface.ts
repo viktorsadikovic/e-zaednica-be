@@ -3,4 +3,5 @@ export enum ResidentProfileStatus {
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
   DISABLED = 'DISABLED',
+  DELETED = 'DELETED',
 }

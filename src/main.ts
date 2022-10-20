@@ -29,6 +29,11 @@ async function bootstrap() {
     }),
   );
 
+  app.enableCors({
+    origin: '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  });
+
   const config = new DocumentBuilder()
     .setTitle(`${configService.get('APP_NAME')} API documentation`)
     .setDescription(

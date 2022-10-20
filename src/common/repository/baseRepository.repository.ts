@@ -91,6 +91,7 @@ export abstract class BaseRepository<T extends Document> {
     return this.entityModel
       .find(filter, { _v: 0, __v: 0, ...projection })
       .populate<any>(paths)
+      .sort({ createdAt: 'desc' })
       .catch((err) => {
         Logger.error(err);
         throw new InternalServerErrorException(err);

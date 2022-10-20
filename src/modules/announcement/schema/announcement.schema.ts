@@ -1,5 +1,9 @@
-import { Prop, Schema } from '@nestjs/mongoose';
-import { SchemaTypes, Types } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, SchemaTypes, Types } from 'mongoose';
+import { AnnouncementVoteType } from '../interface/announcement-vote-type.interface';
+import { AnnouncementVote } from '../interface/announcement-vote.interface';
+
+export type AnnouncementDocument = Announcement & Document;
 
 @Schema({ timestamps: true })
 export class Announcement {
@@ -17,6 +21,26 @@ export class Announcement {
 
   @Prop({ type: SchemaTypes.Array, default: [] })
   photos: String[];
-  //   upvotes: number;
-  //   downvotes: number;
+
+  @Prop({
+    type: [
+      {
+        _id: false,
+        profile: {
+          type: SchemaTypes.ObjectId,
+          required: true,
+          ref: 'ResidentProfile',
+        },
+        type: {
+          type: SchemaTypes.String,
+          enum: AnnouncementVoteType,
+          required: true,
+        },
+      },
+    ],
+    default: [],
+  })
+  votes: Array<AnnouncementVote>;
 }
+
+export const AnnouncementSchema = SchemaFactory.createForClass(Announcement);

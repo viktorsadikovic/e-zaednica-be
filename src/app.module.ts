@@ -1,18 +1,22 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { HasActiveProfileGuard } from './common/guards/active-profile.guard';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
-import { AuthModule } from './modules/auth/auth.module';
-import { UserModule } from './modules/user/user.module';
-import { ResidentProfileModule } from './modules/resident-profile/resident-profile.module';
-import { HouseCouncilModule } from './modules/house-council/house-council.module';
-import { ChatModule } from './modules/chat/chat.module';
+import { AmenityItemModule } from './modules/amenity-item/amenity-item.module';
 import { AmenityModule } from './modules/amenity/amenity.module';
 import { AnnouncementModule } from './modules/announcement/announcement.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { ChatModule } from './modules/chat/chat.module';
+import { CommentModule } from './modules/comment/comment.module';
+import { HouseCouncilModule } from './modules/house-council/house-council.module';
+import { ResidentProfileModule } from './modules/resident-profile/resident-profile.module';
+import { UserModule } from './modules/user/user.module';
 
 @Module({
   imports: [
@@ -23,6 +27,7 @@ import { AnnouncementModule } from './modules/announcement/announcement.module';
       ttl: 60,
       limit: 30,
     }),
+    ScheduleModule.forRoot(),
     MongooseModule.forRoot('mongodb://localhost/e-zaednica'),
     AuthModule,
     UserModule,
@@ -31,7 +36,9 @@ import { AnnouncementModule } from './modules/announcement/announcement.module';
     ChatModule,
     AmenityModule,
     AnnouncementModule,
-],
+    CommentModule,
+    AmenityItemModule,
+  ],
   controllers: [AppController],
   providers: [
     AppService,
@@ -39,14 +46,15 @@ import { AnnouncementModule } from './modules/announcement/announcement.module';
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
     },
-        {
+    {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
-    // {
-    //   provide: APP_GUARD,
-    //   useClass: RolesGuard,
-    // },
+    {
+      provide: APP_GUARD,
+      useClass: HasActiveProfileGuard,
+    },
+    Logger,
   ],
 })
 export class AppModule {}

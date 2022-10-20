@@ -46,17 +46,18 @@ export class AuthController {
   }
 
   @AllowUnauthenticated()
-  @Get('/validate-password-reset')
-  async validatePasswordReset(@Query() params: ValidatePasswordResetTokenDto) {
-    return await this.authService.validatePasswordResetToken(params);
+  @Post('/validate-password-reset')
+  async validatePasswordReset(
+    @Body() validatePasswordResetDto: ValidatePasswordResetTokenDto,
+  ) {
+    return await this.authService.validatePasswordResetToken(
+      validatePasswordResetDto,
+    );
   }
 
   @AllowUnauthenticated()
   @Post('/password-reset')
-  async passwordReset(
-    @Query() params: ValidatePasswordResetTokenDto,
-    @Body() passwordResetDto: PasswordResetDto,
-  ) {
-    return await this.authService.resetPassword(params, passwordResetDto);
+  async passwordReset(@Body() passwordResetDto: PasswordResetDto) {
+    return await this.authService.resetPassword(passwordResetDto);
   }
 }
