@@ -1,9 +1,10 @@
 import {
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { FilterQuery, Types, UpdateQuery } from 'mongoose';
+import { FilterQuery, ObjectId, Types, UpdateQuery } from 'mongoose';
 import { HouseCouncilService } from '../house-council/house-council.service';
 import { Role } from '../user/interface/role.interface';
 import { UserDocument } from '../user/schema/user.schema';
@@ -14,6 +15,7 @@ import { HouseCouncilRole } from './interface/house-council-role.interface';
 import { ResidentProfileStatus } from './interface/resident-profile-status.interface';
 import { ResidentProfileRepository } from './resident-profile.repository';
 import { ResidentProfileDocument } from './schema/resident-profile.schema';
+import { Parser } from 'json2csv';
 
 @Injectable()
 export class ResidentProfileService {
@@ -53,6 +55,19 @@ export class ResidentProfileService {
     return await this.residentProfileRepository.find(filter);
   }
 
+  async getResidentsByHouseCouncil(houseCouncilId: string) {
+    return await this.residentProfileRepository.findAndPopulate(
+      {
+        houseCouncil: houseCouncilId,
+      },
+      [
+        {
+          path: 'user',
+        },
+      ],
+    );
+  }
+
   async create(
     apartmentNumber: number,
     houseCouncilId: string,
@@ -67,15 +82,6 @@ export class ResidentProfileService {
       role,
       status,
     });
-
-    // await this.houseCouncilService.findOneAndUpdate(
-    //   { _id: houseCouncilId },
-    //   {
-    //     $push: {
-    //       profiles: profile._id,
-    //     },
-    //   },
-    // );
 
     await this.userService.findOneAndUpdate(
       { _id: user._id },
@@ -101,6 +107,93 @@ export class ResidentProfileService {
       { _id: user.activeProfile._id },
       { apartmentNumber: editResidentProfileDto.apartmentNumber },
     );
+  }
+
+  async exportResidents(user: UserDocument) {
+    const fields = [
+      'firstName',
+      'lastName',
+      'email',
+      'phone',
+      'apartmentNumber',
+      'street',
+      'number',
+      'city',
+      'zipcode',
+      'country',
+      'role',
+      'status',
+    ];
+    const data = await this.residentProfileRepository.aggregate([
+      {
+        $match: {
+          houseCouncil: user.activeProfile['houseCouncil'],
+        },
+      },
+      {
+        $lookup: {
+          from: 'housecouncils',
+          localField: 'houseCouncil',
+          foreignField: '_id',
+          as: 'houseCouncil',
+        },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'user',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      {
+        $project: {
+          firstName: {
+            $arrayElemAt: ['$user.firstName', 0],
+          },
+          lastName: {
+            $arrayElemAt: ['$user.lastName', 0],
+          },
+          email: {
+            $arrayElemAt: ['$user.email', 0],
+          },
+          phone: {
+            $arrayElemAt: ['$user.phone', 0],
+          },
+          apartmentNumber: 1,
+          street: {
+            $arrayElemAt: ['$houseCouncil.street', 0],
+          },
+          number: {
+            $arrayElemAt: ['$houseCouncil.number', 0],
+          },
+          city: {
+            $arrayElemAt: ['$houseCouncil.city', 0],
+          },
+          zipcode: {
+            $arrayElemAt: ['$houseCouncil.zipcode', 0],
+          },
+          country: {
+            $arrayElemAt: ['$houseCouncil.country', 0],
+          },
+          role: 1,
+          status: 1,
+        },
+      },
+    ]);
+
+    const opts = { fields };
+    const parser = new Parser(opts);
+
+    try {
+      const csv = parser.parse(data);
+
+      return csv;
+    } catch (error) {
+      throw new InternalServerErrorException(
+        'Internal server error while exporting data. Please try again later.',
+      );
+    }
   }
 
   async switchProfile(residentProfileId: string, user: UserDocument) {

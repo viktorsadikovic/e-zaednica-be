@@ -5,7 +5,9 @@ import {
   Param,
   Post,
   Query,
+  Res,
   UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Types } from 'mongoose';
@@ -17,6 +19,8 @@ import { AmenityItemService } from './amenity-item.service';
 import { SubmitAmenityItemDto } from './dto/request/submit-amenity-item-dto.dto';
 import { AmenityItemQueryDto } from './interface/amenity-item-query-dto.dto';
 import { AmenityItemStatus } from './interface/amenity-item-status.interface';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Response } from 'express';
 
 @ApiTags('amenity-item')
 @ApiBearerAuth('accessToken')
@@ -28,6 +32,20 @@ export class AmenityItemController {
   @Get('/find')
   async find(@Query() params: AmenityItemQueryDto, @User() user: UserDocument) {
     return await this.amenityItemService.find(params, user);
+  }
+
+  @Get('/export')
+  async exportAmenityItems(
+    @Res() res: Response,
+    @Query() params: AmenityItemQueryDto,
+    @User() user: UserDocument,
+  ) {
+    const data = await this.amenityItemService.exportAmenityItems(params, user);
+
+    res.header('Content-Type', 'text/csv');
+    res.attachment('statements.csv');
+
+    return res.send(data);
   }
 
   @Get('/by-house-council/:id')
@@ -54,13 +72,13 @@ export class AmenityItemController {
   async submitAmenityItem(
     @Param('id', ValidateMongoId) id: string,
     @Body() submitAmenityItemDto: SubmitAmenityItemDto,
-    // @UploadedFile() document: Express.Multer.File,
+    @User() user: UserDocument,
   ) {
-    console.log(submitAmenityItemDto);
-    // return await this.amenityItemService.submitAmenityItem(
-    //   id,
-    //   submitAmenityItemDto,
-    // );
+    return await this.amenityItemService.submitAmenityItem(
+      id,
+      submitAmenityItemDto,
+      user,
+    );
   }
 
   @Post('change-status/:id/:status')

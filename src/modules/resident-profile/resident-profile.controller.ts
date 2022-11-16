@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
 import { User } from '../../common/decorators/user.decorator';
 import { ValidateMongoId } from '../../common/pipes/validateMongoId.pipe';
 import { UserDocument } from '../user/schema/user.schema';
@@ -19,6 +20,13 @@ export class ResidentProfileController {
   @Get('')
   async getMyProfiles(@User() user: UserDocument) {
     return await this.residentProfileService.getMyProfiles(user);
+  }
+
+  @Get('/by-house-council')
+  async getResidentsByHouseCouncil(@User() user: UserDocument) {
+    return await this.residentProfileService.getResidentsByHouseCouncil(
+      user.activeProfile['houseCouncil'],
+    );
   }
 
   @Post('/edit')
@@ -65,5 +73,15 @@ export class ResidentProfileController {
   @Get('/active')
   async getActiveProfile(@User() user: UserDocument) {
     return await this.residentProfileService.getActiveProfile(user);
+  }
+
+  @Get('/export')
+  async exportResidents(@Res() res: Response, @User() user: UserDocument) {
+    const data = await this.residentProfileService.exportResidents(user);
+
+    res.header('Content-Type', 'text/csv');
+    res.attachment('statements.csv');
+
+    return res.send(data);
   }
 }

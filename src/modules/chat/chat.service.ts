@@ -109,6 +109,7 @@ export class ChatService {
                   firstName: '$$user.firstName',
                   lastName: '$$user.lastName',
                   email: '$$user.email',
+                  profileImage: '$$user.profileImage',
                 },
               },
             },

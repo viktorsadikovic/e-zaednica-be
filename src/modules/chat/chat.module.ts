@@ -1,5 +1,6 @@
 import { Logger, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { NotificationModule } from '../notification/notification.module';
 import { ResidentProfileModule } from '../resident-profile/resident-profile.module';
 import { ChatController } from './chat.controller';
 import { ChatRepository } from './chat.repository';
@@ -16,6 +17,7 @@ import { Message, MessageSchema } from './schema/message.schema';
       { name: Message.name, schema: MessageSchema },
     ]),
     ResidentProfileModule,
+    NotificationModule,
   ],
   controllers: [ChatController],
   providers: [
@@ -25,6 +27,6 @@ import { Message, MessageSchema } from './schema/message.schema';
     ChatService,
     Logger,
   ],
-  exports: [ChatService]
+  exports: [ChatService],
 })
 export class ChatModule {}

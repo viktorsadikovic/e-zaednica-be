@@ -5,7 +5,9 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { FilterQuery, UpdateQuery } from 'mongoose';
+import { FilterQuery, ObjectId, Types, UpdateQuery } from 'mongoose';
+import { AmenityStatus } from '../amenity/interface/amenity-status.interface';
+import { AmenityVoteType } from '../amenity/interface/amenity-vote-type.interface';
 import { ChatService } from '../chat/chat.service';
 import { HouseCouncilRole } from '../resident-profile/interface/house-council-role.interface';
 import { ResidentProfileStatus } from '../resident-profile/interface/resident-profile-status.interface';
@@ -13,9 +15,11 @@ import { ResidentProfileService } from '../resident-profile/resident-profile.ser
 import { Role } from '../user/interface/role.interface';
 import { UserDocument } from '../user/schema/user.schema';
 import { UserService } from '../user/user.service';
+import { AdminRequestRepository } from './admin-request.repository';
 import { CreateHouseCouncilDto } from './dto/request/createHouseCouncilDto.dto';
 import { EditHouseCouncilDto } from './dto/request/editHouseCouncilDto.dto';
 import { JoinHouseCouncilDto } from './dto/request/joinHouseCouncilDto.dto';
+import { RequestAdminChangeDto } from './dto/request/requestAdminChangeDto.dto';
 import { HouseCouncilRepository } from './house-council.repository';
 import { HouseCouncilDocument } from './schema/house-council.schema';
 
@@ -24,6 +28,7 @@ export class HouseCouncilService {
   constructor(
     private readonly houseCouncilRepository: HouseCouncilRepository,
     private readonly residentProfileService: ResidentProfileService,
+    private readonly adminRequestRepository: AdminRequestRepository,
     private readonly userService: UserService,
     private readonly chatService: ChatService,
   ) {}
@@ -65,7 +70,24 @@ export class HouseCouncilService {
     return await this.changeAdmin(houseCouncil._id, profile._id);
   }
 
-  async changeAdmin(houseCouncilId: string, residentProfileId: string) {
+  async changeAdmin(
+    houseCouncilId: Types.ObjectId,
+    residentProfileId: Types.ObjectId,
+  ) {
+    await this.residentProfileService.findAndUpdate(
+      { houseCouncil: houseCouncilId },
+      {
+        role: HouseCouncilRole.STANDARD_RESIDENT,
+      },
+    );
+
+    await this.residentProfileService.findOneAndUpdate(
+      { _id: residentProfileId },
+      {
+        role: HouseCouncilRole.ADMIN,
+      },
+    );
+
     return await this.findOneAndUpdate(
       { _id: houseCouncilId },
       {
@@ -161,6 +183,104 @@ export class HouseCouncilService {
     return {
       status: true,
     };
+  }
+
+  async getAdminChangeRequests(user: UserDocument) {
+    return await this.adminRequestRepository.findAndPopulate(
+      {
+        houseCouncil: user.activeProfile['houseCouncil'],
+        status: AmenityStatus.PENDING,
+      },
+      [{ path: 'votes', populate: [{ path: 'resident', populate: 'user' }] }],
+    );
+  }
+
+  async requestAdminChange(
+    requestAdminChangeDto: RequestAdminChangeDto,
+    houseCouncilId: string,
+    user: UserDocument,
+  ) {
+    return await this.adminRequestRepository.create({
+      houseCouncil: houseCouncilId,
+      votes: [
+        {
+          voter: user.activeProfile._id,
+          resident: requestAdminChangeDto.residentId,
+        },
+      ],
+    });
+  }
+
+  async submitAdminChangeVote(
+    id: string,
+    resident: string,
+    user: UserDocument,
+  ) {
+    await this.adminRequestRepository.findOneAndUpdate(
+      {
+        _id: id,
+      },
+      {
+        $pull: {
+          votes: {
+            voter: user.activeProfile._id,
+          },
+        },
+      },
+    );
+
+    let adminRequest = await this.adminRequestRepository.findOneAndUpdate(
+      { _id: id },
+      {
+        $push: {
+          votes: {
+            voter: user.activeProfile._id,
+            resident: resident,
+          },
+        },
+      },
+    );
+
+    let status = AmenityStatus.PENDING;
+    const profilesByHouseCouncil = await this.residentProfileService.find({
+      houseCouncil: user.activeProfile['houseCouncil'],
+    });
+    const numberOfResidents = profilesByHouseCouncil.length;
+
+    if (numberOfResidents === adminRequest.votes.length) {
+      const counts = {};
+      for (const vote of adminRequest.votes) {
+        counts[vote.resident] = counts[vote.resident]
+          ? counts[vote.resident] + 1
+          : 1;
+      }
+      const arr: number[] = Object.values(counts);
+      const highestVoteNumber = Math.max(...arr);
+
+      const mostVotedResident = Object.keys(counts).find(
+        (key) => counts[key] === highestVoteNumber,
+      );
+
+      console.log(counts, mostVotedResident);
+
+      status = AmenityStatus.APPROVED;
+
+      await this.changeAdmin(
+        adminRequest.houseCouncil,
+        new Types.ObjectId(mostVotedResident),
+      );
+    }
+
+    adminRequest = await this.adminRequestRepository.findOneAndUpdate(
+      { _id: id },
+      {
+        $set: {
+          status: status,
+        },
+      },
+    );
+
+    return adminRequest;
   }
 
   private async checkAccessPermission(

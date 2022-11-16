@@ -17,6 +17,8 @@ import { CommentModule } from './modules/comment/comment.module';
 import { HouseCouncilModule } from './modules/house-council/house-council.module';
 import { ResidentProfileModule } from './modules/resident-profile/resident-profile.module';
 import { UserModule } from './modules/user/user.module';
+import { MailerModule } from '@nestjs-modules/mailer';
+import { NotificationModule } from './modules/notification/notification.module';
 
 @Module({
   imports: [
@@ -25,7 +27,7 @@ import { UserModule } from './modules/user/user.module';
     }),
     ThrottlerModule.forRoot({
       ttl: 60,
-      limit: 30,
+      limit: 1000,
     }),
     ScheduleModule.forRoot(),
     MongooseModule.forRoot('mongodb://localhost/e-zaednica'),
@@ -38,6 +40,20 @@ import { UserModule } from './modules/user/user.module';
     AnnouncementModule,
     CommentModule,
     AmenityItemModule,
+    MailerModule.forRoot({
+      transport: {
+        host: 'smtp.example.com',
+        secure: false,
+        auth: {
+          user: 'viktor',
+          pass: 'test',
+        },
+      },
+      defaults: {
+        from: '"No Reply" <no-reply@nestjs.com>',
+      },
+    }),
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [

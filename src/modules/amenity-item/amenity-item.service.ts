@@ -1,20 +1,25 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
+import { Parser } from 'json2csv';
 import { FilterQuery, Types, UpdateQuery } from 'mongoose';
+import { AmenityRepository } from '../amenity/amenity.repository';
+import { AmenityStatus } from '../amenity/interface/amenity-status.interface';
+import { Repeat } from '../amenity/interface/repeat.interface';
+import { AmenityDocument } from '../amenity/schema/amenity.schema';
+import { HouseCouncilRole } from '../resident-profile/interface/house-council-role.interface';
+import { ResidentProfileStatus } from '../resident-profile/interface/resident-profile-status.interface';
+import { ResidentProfileRepository } from '../resident-profile/resident-profile.repository';
+import { ResidentProfileDocument } from '../resident-profile/schema/resident-profile.schema';
+import { UserDocument } from '../user/schema/user.schema';
 import { AmenityItemRepository } from './amenity-item.repository';
 import { SubmitAmenityItemDto } from './dto/request/submit-amenity-item-dto.dto';
+import { AmenityItemQueryDto } from './interface/amenity-item-query-dto.dto';
+import { AmenityItemSortMap } from './interface/amenity-item-sort-criteria.interface';
 import { AmenityItemStatus } from './interface/amenity-item-status.interface';
 import { AmenityItem, AmenityItemDocument } from './schema/amenity-item.schema';
-import { Cron } from '@nestjs/schedule';
-import { AmenityRepository } from '../amenity/amenity.repository';
-import { Repeat } from '../amenity/interface/repeat.interface';
-import { ResidentProfileRepository } from '../resident-profile/resident-profile.repository';
-import { ResidentProfileStatus } from '../resident-profile/interface/resident-profile-status.interface';
-import { AmenityStatus } from '../amenity/interface/amenity-status.interface';
-import { AmenityDocument } from '../amenity/schema/amenity.schema';
-import { ResidentProfileDocument } from '../resident-profile/schema/resident-profile.schema';
-import { AmenityItemQueryDto } from './interface/amenity-item-query-dto.dto';
-import { UserDocument } from '../user/schema/user.schema';
-import { AmenityItemSortMap } from './interface/amenity-item-sort-criteria.interface';
 
 @Injectable()
 export class AmenityItemService {
@@ -239,6 +244,153 @@ export class AmenityItemService {
     ]);
   }
 
+  async exportAmenityItems(params: AmenityItemQueryDto, user: UserDocument) {
+    const fields = [
+      'title',
+      'description',
+      'amount',
+      'dueDate',
+      'recurring',
+      'status',
+      'firstName',
+      'lastName',
+      'email',
+      'phone',
+      'apartmentNumber',
+      'street',
+      'number',
+      'city',
+      'zipcode',
+      'country',
+      'role',
+    ];
+    let filters = {};
+
+    for (const key in params) {
+      if (key === 'search') {
+        const regex = {
+          $regex:
+            '.*(' +
+            params.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
+            ').*',
+          $options: 'i',
+        };
+
+        filters = {
+          ...filters,
+          $or: [
+            {
+              description: regex,
+            },
+            {
+              title: regex,
+            },
+          ],
+        };
+      } else if (key === 'resident') {
+        filters['resident._id'] = new Types.ObjectId(params[key]);
+      }
+    }
+    filters = {
+      ...filters,
+      'resident.houseCouncil': user.activeProfile['houseCouncil'],
+    };
+
+    const data = await this.amenityItemRepository.aggregate([
+      {
+        $lookup: {
+          from: 'residentprofiles',
+          localField: 'resident',
+          foreignField: '_id',
+          as: 'resident',
+        },
+      },
+      {
+        $match: filters,
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'resident.user',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      {
+        $lookup: {
+          from: 'amenities',
+          localField: 'amenity',
+          foreignField: '_id',
+          as: 'amenity',
+        },
+      },
+      {
+        $lookup: {
+          from: 'housecouncils',
+          localField: 'amenity.houseCouncil',
+          foreignField: '_id',
+          as: 'houseCouncil',
+        },
+      },
+      {
+        $project: {
+          title: 1,
+          description: 1,
+          amount: 1,
+          dueDate: 1,
+          recurring: 1,
+          status: 1,
+          firstName: {
+            $arrayElemAt: ['$user.firstName', 0],
+          },
+          lastName: {
+            $arrayElemAt: ['$user.lastName', 0],
+          },
+          email: {
+            $arrayElemAt: ['$user.email', 0],
+          },
+          phone: {
+            $arrayElemAt: ['$user.phone', 0],
+          },
+          apartmentNumber: {
+            $arrayElemAt: ['$resident.apartmentNumber', 0],
+          },
+          street: {
+            $arrayElemAt: ['$houseCouncil.street', 0],
+          },
+          number: {
+            $arrayElemAt: ['$houseCouncil.number', 0],
+          },
+          city: {
+            $arrayElemAt: ['$houseCouncil.city', 0],
+          },
+          zipcode: {
+            $arrayElemAt: ['$houseCouncil.zipcode', 0],
+          },
+          country: {
+            $arrayElemAt: ['$houseCouncil.country', 0],
+          },
+          role: {
+            $arrayElemAt: ['$resident.role', 0],
+          },
+        },
+      },
+    ]);
+
+    const opts = { fields };
+    const parser = new Parser(opts);
+
+    try {
+      const csv = parser.parse(data);
+
+      return csv;
+    } catch (error) {
+      throw new InternalServerErrorException(
+        'Internal server error while exporting data. Please try again later.',
+      );
+    }
+  }
+
   async findAll(
     filter: FilterQuery<AmenityItemDocument>,
     limit: number = 5,
@@ -292,11 +444,13 @@ export class AmenityItemService {
   async submitAmenityItem(
     _id: string,
     submitAmenityItemDto: SubmitAmenityItemDto,
+    user: UserDocument,
   ) {
-    return this.findOneAndUpdate(
-      { _id },
-      { ...submitAmenityItemDto, status: AmenityItemStatus.UNDER_REVIEW },
-    );
+    let status = AmenityItemStatus.UNDER_REVIEW;
+    if (user.activeProfile['role'] === HouseCouncilRole.ADMIN) {
+      status = AmenityItemStatus.ACCEPTED;
+    }
+    return this.findOneAndUpdate({ _id }, { ...submitAmenityItemDto, status });
   }
 
   async changeStatus(_id: string, status: AmenityItemStatus) {

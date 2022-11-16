@@ -4,6 +4,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { FilterQuery, Types, UpdateQuery } from 'mongoose';
+import { NotificationType } from '../notification/interface/notification-type.interface';
+import { NotificationService } from '../notification/notification.service';
+import { ResidentProfileService } from '../resident-profile/resident-profile.service';
 import { Role } from '../user/interface/role.interface';
 import { UserDocument } from '../user/schema/user.schema';
 import { AnnouncementRepository } from './announcement.repository';
@@ -17,6 +20,8 @@ import { AnnouncementDocument } from './schema/announcement.schema';
 export class AnnouncementService {
   constructor(
     private readonly announcementRepository: AnnouncementRepository,
+    private readonly notificationService: NotificationService,
+    private readonly residentProfileService: ResidentProfileService,
   ) {}
 
   async findOneAndUpdate(
@@ -141,6 +146,7 @@ export class AnnouncementService {
                   firstName: '$$user.firstName',
                   lastName: '$$user.lastName',
                   email: '$$user.email',
+                  profileImage: '$$user.profileImage',
                 },
               },
             },
@@ -159,7 +165,16 @@ export class AnnouncementService {
       resident: user.activeProfile._id,
       houseCouncil: user.activeProfile['houseCouncil'],
     };
-    return await this.announcementRepository.create(announcement);
+    const response = await this.announcementRepository.create(announcement);
+    // const residents = await this.residentProfileService.find({
+    //   houseCouncil: user.activeProfile['houseCouncil'],
+    // });
+    // await this.notificationService.sendNotification(
+    //   user.activeProfile._id.toString(),
+    //   NotificationType.ANNOUNCEMENT,
+    //   residents,
+    // );
+    return response;
   }
 
   async edit(

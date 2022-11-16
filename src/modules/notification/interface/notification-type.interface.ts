@@ -1,0 +1,7 @@
+export enum NotificationType {
+  CHAT = 'CHAT',
+  ANNOUNCEMENT = 'ANNOUNCEMENT',
+  AMENITY = 'AMENITY',
+  AMENITY_ITEM = 'AMENITY ITEM',
+  PROFILE = 'PROFILE',
+}

@@ -21,10 +21,11 @@ export class AmenityItemQueryDto {
   })
   status?: AmenityItemStatus;
 
-  @IsMongoId()
   @ApiProperty({
     required: false,
   })
+  @IsMongoId()
+  @IsOptional()
   resident?: string;
 
   @IsString()
