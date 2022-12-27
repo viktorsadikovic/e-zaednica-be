@@ -235,12 +235,7 @@ export class AmenityItemService {
       },
       {
         $limit: 5,
-      },
-      {
-        $project: {
-          resident: 0,
-        },
-      },
+      }
     ]);
   }
 

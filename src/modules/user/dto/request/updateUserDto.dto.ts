@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsString, Validate } from 'class-validator';
+import { IsDateString, IsOptional, IsString, Validate } from 'class-validator';
 import { IsOver18Years } from '../../../../common/validators/isOver18Years.validator';
 
 export class UpdateUserDto {
@@ -24,5 +24,6 @@ export class UpdateUserDto {
 
   @ApiPropertyOptional()
   @IsString()
+  @IsOptional()
   profileImage: string;
 }
