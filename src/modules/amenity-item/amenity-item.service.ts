@@ -225,6 +225,14 @@ export class AmenityItemService {
         },
       },
       {
+        $lookup: {
+          from: 'users',
+          localField: 'resident.user',
+          foreignField: '_id',
+          as: 'user',
+        }
+      },
+      {
         $match: filters,
       },
       {
